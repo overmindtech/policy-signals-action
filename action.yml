@@ -142,13 +142,12 @@ runs:
           
           echo "Submitting signal: $NAMESPACE"
           
-          # Submit signal to Overmind
+          # Submit signal to Overmind (CLI uses OVM_API_KEY env var)
           overmind changes submit-signal \
             --title "Policy: $NAMESPACE" \
             --description "$MESSAGE" \
             --value "${{ inputs.signal-severity }}" \
-            --ticket-link "${{ github.event.pull_request.html_url }}" \
-            --api-key "$OVERMIND_API_KEY"
+            --ticket-link "${{ github.event.pull_request.html_url }}"
         done
         
         echo "All policy violations submitted to Overmind"
