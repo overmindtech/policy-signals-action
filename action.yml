@@ -124,10 +124,20 @@ runs:
     - name: Submit Signals to Overmind
       if: steps.policy-check.outputs.has_violations == 'true'
       shell: bash
-      env:
-        OVERMIND_API_KEY: ${{ inputs.overmind-api-key }}
       run: |
         echo "Submitting policy violations as Overmind Custom Signals..."
+        
+        # Set authentication for Overmind CLI (force non-interactive)
+        export OVM_API_KEY="${{ inputs.overmind-api-key }}"
+        export OVERMIND_API_KEY="${{ inputs.overmind-api-key }}"
+        
+        # Verify API key is set
+        if [ -z "$OVM_API_KEY" ]; then
+          echo "ERROR: Overmind API key is not set"
+          exit 1
+        fi
+        
+        echo "Using API key authentication (first 8 chars): ${OVM_API_KEY:0:8}..."
         
         # Parse violations and submit each as a signal
         cat violations.json | jq -c '.[] | select(.failures != null) | .namespace as $ns | .failures[] | {namespace: $ns, msg: .msg, query: .metadata.query}' | while read -r violation; do
@@ -142,12 +152,15 @@ runs:
           
           echo "Submitting signal: $NAMESPACE"
           
-          # Submit signal to Overmind (CLI uses OVM_API_KEY env var)
-          overmind changes submit-signal \
+          # Submit signal to Overmind with explicit non-interactive mode
+          timeout 30 overmind changes submit-signal \
             --title "Policy: $NAMESPACE" \
             --description "$MESSAGE" \
             --value "${{ inputs.signal-severity }}" \
-            --ticket-link "${{ github.event.pull_request.html_url }}"
+            --ticket-link "${{ github.event.pull_request.html_url }}" || {
+            echo "WARNING: Failed to submit signal for $NAMESPACE (timeout or auth issue)"
+            continue
+          }
         done
         
         echo "All policy violations submitted to Overmind"
