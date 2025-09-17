@@ -26,6 +26,11 @@ inputs:
     required: false
     default: '-3'
   
+  signal-category:
+    description: 'Category for the policy signals'
+    required: false
+    default: 'Policies'
+  
   fail-on-violations:
     description: 'Fail the action if policy violations are found'
     required: false
@@ -170,6 +175,7 @@ runs:
             --title "Policy: $NAMESPACE" \
             --description "$MESSAGE" \
             --value "${{ inputs.signal-severity }}" \
+            --category "${{ inputs.signal-category }}" \
             --ticket-link "$TICKET_LINK" || {
             echo "WARNING: Failed to submit signal for $NAMESPACE (timeout or auth issue)"
             continue
