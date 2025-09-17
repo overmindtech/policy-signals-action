@@ -11,7 +11,7 @@
   </p>
   
   <p>
-    Add policy context to your infrastructure changes. Run Conftest/OPA policies and submit violations as Custom Signals to enhance Overmind's risk analysis - all in parallel with your terraform analysis.
+    Add policy context to your infrastructure changes. Run Conftest/OPA policies and submit violations as organized policy signals to enhance Overmind's risk analysis - all in parallel with your terraform analysis.
   </p>
 </div>
 <br/>
@@ -25,7 +25,7 @@
 
 ## Quick Start
 
-Add policy checks to your Overmind workflow in under 2 minutes. This action runs your Conftest/OPA policies and submits violations as Custom Signals, giving you immediate feedback on compliance issues while terraform analysis runs in parallel.
+Add policy checks to your Overmind workflow in under 2 minutes. This action runs your Conftest/OPA policies and submits violations as organized "Policies" signals, giving you immediate feedback on compliance issues while terraform analysis runs in parallel.
 
 ```yaml
 - uses: overmindtech/policy-signals-action@v1
@@ -39,7 +39,7 @@ Add policy checks to your Overmind workflow in under 2 minutes. This action runs
 This GitHub Action enhances your Overmind change analysis by:
 
 1. **Running policy checks immediately** when a PR is created/updated
-2. **Submitting violations as Custom Signals** to Overmind (in parallel with terraform analysis)
+2. **Submitting violations as organized policy signals** to Overmind (in parallel with terraform analysis)
 3. **Providing instant feedback** on compliance issues (typically within 30 seconds)
 4. **Enriching the PR comment** with policy context alongside blast radius analysis
 
@@ -47,7 +47,7 @@ This GitHub Action enhances your Overmind change analysis by:
 
 <div align="center">
   <img src="docs/images/policies.png" alt="Custom Signals in Overmind" width="600">
-  <p><em>Policy violations appear as organized Custom Signals in your PR analysis</em></p>
+  <p><em>Policy violations appear as organized "Policies" signals in your PR analysis</em></p>
 </div>
 
 Overmind aggregates Custom Signals by **title**, not just PR URL and handles the generation of the Signal summary. 
@@ -126,9 +126,12 @@ deny[msg] {
 | `policies-path` | Path to your Conftest/OPA policy files | Yes | - |
 | `overmind-api-key` | Your Overmind API key | Yes | - |
 | `terraform-plan-json` | Path to terraform plan JSON (if available) | No | Auto-detected |
-| `policy-engine` | Policy engine to use | No | `conftest` |
 | `signal-severity` | Default severity for policy violations (-5 to +5) | No | `-3` |
+| `signal-category` | Category for organizing policy signals in Overmind | No | `Policies` |
+| `ticket-link` | Custom URL to link signals to (e.g., Terraform Cloud run) | No | GitHub PR URL |
 | `fail-on-violations` | Fail the action if violations are found | No | `false` |
+| `conftest-version` | Version of Conftest to install | No | `0.46.0` |
+| `overmind-cli-version` | Version of Overmind CLI to install | No | `1.9.4` |
 
 ### Advanced Configuration
 
@@ -139,7 +142,21 @@ deny[msg] {
     overmind-api-key: ${{ secrets.OVM_API_KEY }}
     terraform-plan-json: './tfplan.json'
     signal-severity: -4  # Higher risk score for violations
+    signal-category: 'Security Policies'  # Custom category
+    ticket-link: 'https://app.terraform.io/app/org/workspace/runs/run-xyz'  # Terraform Cloud run
     fail-on-violations: true  # Block PR on policy violations
+```
+
+### Terraform Cloud Integration
+
+The `ticket-link` input is particularly useful for Terraform Cloud workflows:
+
+```yaml
+- uses: overmindtech/policy-signals-action@v1
+  with:
+    policies-path: './policies'
+    overmind-api-key: ${{ secrets.OVM_API_KEY }}
+    ticket-link: ${{ env.TF_CLOUD_RUN_URL }}  # Links signals to TFC run instead of GitHub PR
 ```
 
 ## Example Policies
