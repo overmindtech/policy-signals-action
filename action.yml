@@ -31,6 +31,11 @@ inputs:
     required: false
     default: 'false'
   
+  ticket-link:
+    description: 'URL to link the signal to (e.g., Terraform Cloud run URL). Defaults to GitHub PR URL if not provided.'
+    required: false
+    default: ''
+  
   conftest-version:
     description: 'Version of Conftest to install'
     required: false
@@ -139,6 +144,14 @@ runs:
         
         echo "API key is set and ready for authentication"
         
+        # Determine ticket link (use input or fallback to PR URL)
+        TICKET_LINK="${{ inputs.ticket-link }}"
+        if [ -z "$TICKET_LINK" ]; then
+          TICKET_LINK="${{ github.event.pull_request.html_url }}"
+        fi
+        
+        echo "Using ticket link: $TICKET_LINK"
+        
         # Parse violations and submit each as a signal
         cat violations.json | jq -c '.[] | select(.failures != null) | .namespace as $ns | .failures[] | {namespace: $ns, msg: .msg, query: .metadata.query}' | while read -r violation; do
           # Extract namespace and message
@@ -157,7 +170,7 @@ runs:
             --title "Policy: $NAMESPACE" \
             --description "$MESSAGE" \
             --value "${{ inputs.signal-severity }}" \
-            --ticket-link "${{ github.event.pull_request.html_url }}" || {
+            --ticket-link "$TICKET_LINK" || {
             echo "WARNING: Failed to submit signal for $NAMESPACE (timeout or auth issue)"
             continue
           }
