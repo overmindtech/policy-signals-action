@@ -137,7 +137,7 @@ runs:
           exit 1
         fi
         
-        echo "Using API key authentication (first 8 chars): ${OVM_API_KEY:0:8}..."
+        echo "API key is set and ready for authentication"
         
         # Parse violations and submit each as a signal
         cat violations.json | jq -c '.[] | select(.failures != null) | .namespace as $ns | .failures[] | {namespace: $ns, msg: .msg, query: .metadata.query}' | while read -r violation; do
