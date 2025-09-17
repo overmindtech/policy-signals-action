@@ -296,7 +296,22 @@ The action logs will show `✓ No policy violations found` and complete successf
 
 ---
 
-<p align="center">
-  Made with care by <a href="https://overmind.tech">Overmind</a>
-  <br/>
-</p>
+## Legal & Compliance
+
+### Privacy Policy
+
+This action does not collect, store, or process any personal data. The only data transmitted is policy violation information to your configured Overmind instance. For more information, see [Overmind's Privacy Policy](https://overmind.tech/info/privacy-policy).
+
+### Terms of Service
+
+By using this action, you agree to the [GitHub Terms of Service](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service) and [Overmind's Terms of Service](https://overmind.tech/info/terms-of-use).
+
+### Contact
+
+- **Support**: Join our [Discord community](https://discord.com/invite/5UKsqAkPWG)
+- **Security Issues**: Email <security@overmind.tech>
+- **General Inquiries**: Contact us at <hello@overmind.tech>
+
+---
+
+*Made with care by [Overmind](https://overmind.tech)*
