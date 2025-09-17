@@ -1,0 +1,99 @@
+name: Terraform Analysis with Policy Checks
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  # Standard Terraform planning job
+  terraform-plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # for AWS OIDC
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TERRAFORM_DEPLOY_ROLE }}
+          aws-region: us-east-1
+      
+      - name: Terraform Init
+        run: terraform init
+      
+      - name: Terraform Plan
+        run: |
+          terraform plan -out=tfplan
+          terraform show -json tfplan > tfplan.json
+      
+      - name: Upload plan for policy checks
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-json
+          path: tfplan.json
+      
+      # Submit plan to Overmind for blast radius analysis
+      - name: Install Overmind CLI
+        uses: overmindtech/actions/install-cli@main
+        with:
+          version: latest
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Submit to Overmind
+        uses: overmindtech/actions/submit-plan@main
+        with:
+          ovm-api-key: ${{ secrets.OVM_API_KEY }}
+          plan-json: ./tfplan.json
+
+  # Policy checks run in parallel with terraform analysis
+  policy-checks:
+    runs-on: ubuntu-latest
+    needs: terraform-plan  # Need the plan file
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download terraform plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-json
+      
+      - name: Run Policy Checks and Submit Signals
+        uses: overmindtech/policy-signals-action@v1
+        with:
+          policies-path: './policies'
+          terraform-plan-json: './tfplan.json'
+          overmind-api-key: ${{ secrets.OVM_API_KEY }}
+          signal-severity: -3
+          fail-on-violations: false  # Set to true to block PRs with violations
+
+  # Alternative: Run policy checks without waiting for terraform plan
+  # This is faster but requires terraform plan to be committed or cached
+  fast-policy-checks:
+    if: false  # Enable this job if you have tfplan.json available immediately
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Generate quick plan (if needed)
+        run: |
+          # This could pull from cache, use a previously committed plan,
+          # or do a quick terraform plan without full authentication
+          echo "Using cached/committed plan..."
+      
+      - name: Run Policy Checks Immediately
+        uses: overmindtech/policy-signals-action@v1
+        with:
+          policies-path: './policies'
+          overmind-api-key: ${{ secrets.OVM_API_KEY }}

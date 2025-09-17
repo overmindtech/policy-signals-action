@@ -1,0 +1,161 @@
+name: 'Overmind Policy Signals'
+description: 'Run policy checks with Conftest/OPA and submit violations as Overmind Custom Signals'
+author: 'Overmind'
+
+branding:
+  icon: 'shield'
+  color: 'purple'
+
+inputs:
+  policies-path:
+    description: 'Path to directory containing Rego policy files'
+    required: true
+    default: './policies'
+  
+  overmind-api-key:
+    description: 'Overmind API key for submitting custom signals'
+    required: true
+  
+  terraform-plan-json:
+    description: 'Path to Terraform plan JSON file (auto-detected if not specified)'
+    required: false
+    default: ''
+  
+  signal-severity:
+    description: 'Severity score for policy violations (-5 to 5)'
+    required: false
+    default: '-3'
+  
+  fail-on-violations:
+    description: 'Fail the action if policy violations are found'
+    required: false
+    default: 'false'
+  
+  conftest-version:
+    description: 'Version of Conftest to install'
+    required: false
+    default: '0.46.0'
+  
+  overmind-cli-version:
+    description: 'Version of Overmind CLI to install'
+    required: false
+    default: 'latest'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Conftest
+      shell: bash
+      run: |
+        echo "Installing Conftest v${{ inputs.conftest-version }}..."
+        wget -q https://github.com/open-policy-agent/conftest/releases/download/v${{ inputs.conftest-version }}/conftest_${{ inputs.conftest-version }}_Linux_x86_64.tar.gz
+        tar xzf conftest_${{ inputs.conftest-version }}_Linux_x86_64.tar.gz
+        sudo mv conftest /usr/local/bin
+        rm conftest_${{ inputs.conftest-version }}_Linux_x86_64.tar.gz
+        conftest --version
+    
+    - name: Install Overmind CLI
+      shell: bash
+      run: |
+        echo "Installing Overmind CLI..."
+        curl -sL https://dl.cloudsmith.io/public/overmind/tools/setup.deb.sh | sudo -E bash
+        sudo apt-get update
+        sudo apt-get install -y overmind-cli
+        overmind --version
+    
+    - name: Find Terraform Plan JSON
+      id: find-plan
+      shell: bash
+      run: |
+        PLAN_FILE="${{ inputs.terraform-plan-json }}"
+        
+        # Auto-detect if not specified
+        if [ -z "$PLAN_FILE" ]; then
+          if [ -f "tfplan.json" ]; then
+            PLAN_FILE="tfplan.json"
+          elif [ -f "plan.json" ]; then
+            PLAN_FILE="plan.json"
+          else
+            # Try to find any .json file that looks like a terraform plan
+            PLAN_FILE=$(find . -maxdepth 2 -name "*.json" -exec grep -l "resource_changes" {} \; | head -1)
+          fi
+        fi
+        
+        if [ -z "$PLAN_FILE" ] || [ ! -f "$PLAN_FILE" ]; then
+          echo "ERROR: Could not find Terraform plan JSON file"
+          echo "Please ensure terraform plan JSON exists or specify path with 'terraform-plan-json' input"
+          exit 1
+        fi
+        
+        echo "Using Terraform plan: $PLAN_FILE"
+        echo "plan_file=$PLAN_FILE" >> $GITHUB_OUTPUT
+    
+    - name: Run Policy Checks
+      id: policy-check
+      shell: bash
+      run: |
+        echo "Running Conftest policies from ${{ inputs.policies-path }}..."
+        
+        # Run Conftest and capture results
+        set +e  # Don't exit on non-zero return code
+        conftest test \
+          --policy "${{ inputs.policies-path }}" \
+          --all-namespaces \
+          --output json \
+          "${{ steps.find-plan.outputs.plan_file }}" > violations.json
+        CONFTEST_EXIT_CODE=$?
+        set -e
+        
+        # Display summary
+        if [ $CONFTEST_EXIT_CODE -eq 0 ]; then
+          echo "✓ No policy violations found"
+          echo "has_violations=false" >> $GITHUB_OUTPUT
+        else
+          echo "⚠ Policy violations detected"
+          echo "has_violations=true" >> $GITHUB_OUTPUT
+          
+          # Show violations in readable format
+          echo ""
+          echo "Policy Violations:"
+          echo "=================="
+          cat violations.json | jq -r '.[] | select(.failures != null) | .failures[] | "- \(.msg)"' 2>/dev/null || echo "Could not parse violations"
+        fi
+    
+    - name: Submit Signals to Overmind
+      if: steps.policy-check.outputs.has_violations == 'true'
+      shell: bash
+      env:
+        OVERMIND_API_KEY: ${{ inputs.overmind-api-key }}
+      run: |
+        echo "Submitting policy violations as Overmind Custom Signals..."
+        
+        # Parse violations and submit each as a signal
+        cat violations.json | jq -c '.[] | select(.failures != null) | .namespace as $ns | .failures[] | {namespace: $ns, msg: .msg, query: .metadata.query}' | while read -r violation; do
+          # Extract namespace and message
+          NAMESPACE=$(echo "$violation" | jq -r '.namespace')
+          MESSAGE=$(echo "$violation" | jq -r '.msg')
+          
+          # Skip if message is empty
+          if [ -z "$MESSAGE" ]; then
+            continue
+          fi
+          
+          echo "Submitting signal: $NAMESPACE"
+          
+          # Submit signal to Overmind
+          overmind changes submit-signal \
+            --title "Policy: $NAMESPACE" \
+            --description "$MESSAGE" \
+            --value "${{ inputs.signal-severity }}" \
+            --ticket-link "${{ github.event.pull_request.html_url }}" \
+            --api-key "$OVERMIND_API_KEY"
+        done
+        
+        echo "All policy violations submitted to Overmind"
+    
+    - name: Fail if violations found
+      if: steps.policy-check.outputs.has_violations == 'true' && inputs.fail-on-violations == 'true'
+      shell: bash
+      run: |
+        echo "ERROR: Policy violations found and fail-on-violations is set to true"
+        exit 1

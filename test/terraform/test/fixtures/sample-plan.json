@@ -1,0 +1,67 @@
+{
+  "format_version": "1.0",
+  "terraform_version": "1.5.0",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.test",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "test",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "my-test-bucket-12345",
+          "tags": {
+            "Name": "Test Bucket",
+            "Environment": "dev"
+          },
+          "force_destroy": false
+        },
+        "after_unknown": {
+          "id": true,
+          "arn": true
+        }
+      }
+    },
+    {
+      "address": "aws_security_group_rule.bad_ssh",
+      "mode": "managed",
+      "type": "aws_security_group_rule",
+      "name": "bad_ssh",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "type": "ingress",
+          "from_port": 22,
+          "to_port": 22,
+          "protocol": "tcp",
+          "cidr_blocks": ["0.0.0.0/0"],
+          "security_group_id": "sg-12345678"
+        }
+      }
+    },
+    {
+      "address": "aws_instance.expensive",
+      "mode": "managed", 
+      "type": "aws_instance",
+      "name": "expensive",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "ami": "ami-0c55b159cbfafe1f0",
+          "instance_type": "x1e.xlarge",
+          "tags": {
+            "Name": "Expensive Instance",
+            "Environment": "dev"
+          }
+        }
+      }
+    }
+  ]
+}

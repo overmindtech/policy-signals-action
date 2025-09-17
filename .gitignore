@@ -137,3 +137,22 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Terraform files
+*.tfplan
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+
+# Policy testing output
+violations.json
+test-output.json
+
+# API keys and secrets (in case someone accidentally creates these files)
+.env
+.env.local
+*.key
+api-key.txt
+overmind-api-key
+secrets.json
